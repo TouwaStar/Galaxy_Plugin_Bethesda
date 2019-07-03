@@ -3,7 +3,6 @@ if sys.platform == 'win32':
     import winreg
 from consts import BETTY_WINREG_LOCATION, BETTY_LAUNCHER_EXE, WINDOWS_UNINSTALL_LOCATION
 import os
-import re
 import logging as log
 
 class LocalClient(object):
@@ -21,51 +20,56 @@ class LocalClient(object):
             return os.path.join(path, BETTY_LAUNCHER_EXE)
         except OSError:
             return ""
+        except Exception as e:
+            log.exception(f"Exception while retrieving client exe path assuming none {repr(e)}")
+            return ""
 
     @property
     def is_installed(self):
         if sys.platform is not 'win32':
+            log.info("Platform is not compatible")
             return False
         try:
+            log.info("Connecting to hkey_local_machine key")
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
+            log.info(f"Opening key at {reg}, {BETTY_WINREG_LOCATION}")
             with winreg.OpenKey(reg, BETTY_WINREG_LOCATION) as key:
                 path = winreg.QueryValueEx(key, "installLocation")[0]
+            log.info(f"Checking if path exists at {os.path.join(path, BETTY_LAUNCHER_EXE)}")
             return os.path.exists(os.path.join(path, BETTY_LAUNCHER_EXE))
-        except OSError:
+        except (OSError, KeyError):
+            return False
+        except Exception as e:
+            log.exception(f"Exception while checking if client is installed, assuming not installed {repr(e)}")
             return False
 
-    def get_game_id(self, regex_pattern, value_query):
-
-        # check if in cache
-        if regex_pattern in self._local_id_cache:
-            return self._local_id_cache[regex_pattern]
-
-        # regex = re.compile(regex_pattern)
-        log.info(regex_pattern)
-        log.info(value_query)
-        local_id = None
+    def get_installed_games(self, products):
+        installed_games = []
         try:
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
-            index = 0
             with winreg.OpenKey(reg, WINDOWS_UNINSTALL_LOCATION) as key:
-                while(True):
-                    try:
-                        subkey_name = winreg.EnumKey(key, index)
-                        index += 1
-                        with winreg.OpenKey(key, subkey_name) as subkey:
-                            log.info( winreg.QueryValueEx(subkey, value_query)[0])
-                            if re.search(regex_pattern, winreg.QueryValueEx(subkey, value_query)[0]):
-                                log.info("here")
-                                unstring = winreg.QueryValueEx(subkey, "UninstallString")[0]
-                                local_id = unstring.split('bethesdanet//uninstall/')[1]
-                                self._local_id_cache[regex_pattern] = local_id
-                                break
-                    except OSError:
-                        continue
-        except OSError:
-            pass
+                for i in range(0, winreg.QueryInfoKey(key)[0]):
+                    subkey_name = winreg.EnumKey(key, i)
+                    with winreg.OpenKey(key, subkey_name) as subkey:
+                        for product in products:
+                            try:
+                                if products[product]['displayName'] in winreg.QueryValueEx(subkey, 'DisplayName')[0]:
+                                    if 'bethesdanet://uninstall' in winreg.QueryValueEx(subkey, 'UninstallString')[0]:
+                                        unstring = winreg.QueryValueEx(subkey, "UninstallString")[0]
+                                        local_id = unstring.split('bethesdanet://uninstall/')[1]
+                                        self._local_id_cache[product] = local_id
+                                        installed_games.append(product)
+                            except OSError:
+                                continue
+        except OSError as e:
+            log.error(f"Unable to parse registry for installed games {repr(e)}")
+            return installed_games
+        except Exception as e:
+            log.exception(f"Unexpected error when parsing registry {repr(e)}")
+            raise
 
-        return local_id
+
+        return installed_games
 
 
 

@@ -10,6 +10,7 @@ from galaxy.api.types import NextStep, Authentication, Game, LicenseInfo, Licens
 from galaxy.api.errors import InvalidCredentials
 from version import __version__
 from urllib.parse import unquote
+import asyncio
 
 from consts import AUTH_PARAMS
 from backend import BethesdaClient
@@ -25,6 +26,7 @@ class BethesdaPlugin(Plugin):
         self.bethesda_client = BethesdaClient(self._http_client)
         self.local_client = LocalClient()
         self.products_cache = {}
+        self.parsing_store_info = None
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
@@ -81,12 +83,19 @@ class BethesdaPlugin(Plugin):
         self.products_cache[reference_id][item] = value
 
     async def _parse_store_games_info(self):
-        store_games_info = await self.bethesda_client.get_store_games_info()
+        if not self.parsing_store_info:
+            self.parsing_store_info = True
+            store_games_info = await self.bethesda_client.get_store_games_info()
+            for game in store_games_info:
+                if not game["externalReferenceId"]:
+                    continue
+                self._add_to_product_cache(game["externalReferenceId"], "displayName", game["displayName"])
+            self.parsing_store_info = False
+        else:
+            while self.parsing_store_info:
+                await asyncio.sleep(1)
 
-        for game in store_games_info:
-            if not game["externalReferenceId"]:
-                continue
-            self._add_to_product_cache(game["externalReferenceId"], "displayName", game["displayName"])
+
 
     async def get_owned_games(self):
         owned_ids = await self.bethesda_client.get_owned_ids()
@@ -113,20 +122,16 @@ class BethesdaPlugin(Plugin):
         return games_to_send
 
     async def get_local_games(self):
-        return []
         # cache is empty
-        # if not self.products_cache:
-        #     await self._parse_store_games_info()
-        #
-        # local_games = []
-        #
-        # for product in self.products_cache:
-        #     rp = f".*{self.products_cache[product]['displayName']}.*"
-        #     id = self.local_client.get_game_id(regex_pattern=rp, value_query="DisplayName")
-        #     if id:
-        #         local_games.append(LocalGame(product, LocalGameState.Installed))
-        #
-        # return local_games
+        if not self.products_cache:
+            await self._parse_store_games_info()
+
+        local_games = []
+        intalled_products = self.local_client.get_installed_games(self.products_cache)
+        for product in intalled_products:
+            local_games.append(LocalGame(product, LocalGameState.Installed))
+
+        return local_games
 
     async def install_game(self, game_id):
         if not self.local_client.is_installed:
