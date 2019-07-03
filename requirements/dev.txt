@@ -1,0 +1,9 @@
+-r app.txt
+invoke==1.2.0
+pytest==4.2.0
+pytest-asyncio==0.10.0
+pytest-mock==1.10.3
+pytest-flakes==4.0.0
+pytest-pythonpath==0.7.3
+pip-tools==3.6.1
+aiohttp==3.5.4
