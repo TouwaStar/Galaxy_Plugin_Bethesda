@@ -54,8 +54,8 @@ class AuthenticatedHttpClient(HttpClient):
     async def do_request(self, method, *args, **kwargs):
         try:
             return await self.request(method, *args, **kwargs)
-
-        except:
+        except Exception as e:
+            log.warning(f"Request failed with {repr(e)}, attempting to refresh credentials")
             await self.authenticate()
             return await self.request(args, kwargs)
 

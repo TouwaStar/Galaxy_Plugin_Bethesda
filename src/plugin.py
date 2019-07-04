@@ -10,14 +10,16 @@ from galaxy.api.types import NextStep, Authentication, Game, LicenseInfo, Licens
 from galaxy.api.errors import InvalidCredentials
 from version import __version__
 from urllib.parse import unquote
-import asyncio
 
 from consts import AUTH_PARAMS
 from backend import BethesdaClient
 from http_client import AuthenticatedHttpClient
-from local import LocalClient
+from local import LocalClient, FREE_GAMES
 import pickle
 import json
+import asyncio
+
+
 
 class BethesdaPlugin(Plugin):
     def __init__(self, reader, writer, token):
@@ -26,7 +28,6 @@ class BethesdaPlugin(Plugin):
         self.bethesda_client = BethesdaClient(self._http_client)
         self.local_client = LocalClient()
         self.products_cache = {}
-        self.parsing_store_info = None
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
@@ -83,19 +84,13 @@ class BethesdaPlugin(Plugin):
         self.products_cache[reference_id][item] = value
 
     async def _parse_store_games_info(self):
-        if not self.parsing_store_info:
-            self.parsing_store_info = True
-            store_games_info = await self.bethesda_client.get_store_games_info()
-            for game in store_games_info:
-                if not game["externalReferenceId"]:
-                    continue
-                self._add_to_product_cache(game["externalReferenceId"], "displayName", game["displayName"])
-            self.parsing_store_info = False
-        else:
-            while self.parsing_store_info:
-                await asyncio.sleep(1)
+        store_games_info = await self.bethesda_client.get_store_games_info()
 
-
+        for game in store_games_info:
+            await asyncio.sleep(0.05)
+            if not game["externalReferenceId"]:
+                continue
+            self._add_to_product_cache(game["externalReferenceId"], "displayName", game["displayName"])
 
     async def get_owned_games(self):
         owned_ids = await self.bethesda_client.get_owned_ids()
@@ -119,6 +114,9 @@ class BethesdaPlugin(Plugin):
             if self.products_cache[product]["owned"]:
                 games_to_send.append(Game(product, self.products_cache[product]["displayName"], None, LicenseInfo(LicenseType.SinglePurchase)))
 
+        for game in FREE_GAMES:
+            games_to_send.append(Game(FREE_GAMES[game], game, None, LicenseInfo(LicenseType.FreeToPlay)))
+
         return games_to_send
 
     async def get_local_games(self):
@@ -127,9 +125,11 @@ class BethesdaPlugin(Plugin):
             await self._parse_store_games_info()
 
         local_games = []
-        intalled_products = self.local_client.get_installed_games(self.products_cache)
-        for product in intalled_products:
+        installed_products = self.local_client.get_installed_games(self.products_cache)
+
+        for product in installed_products:
             local_games.append(LocalGame(product, LocalGameState.Installed))
+
 
         return local_games
 
@@ -140,14 +140,28 @@ class BethesdaPlugin(Plugin):
 
         cmd = self.local_client.client_exe_path + f" --installproduct={game_id}"
         subprocess.Popen(cmd, shell=True)
- 
 
     async def launch_game(self, game_id):
         if not self.local_client.is_installed:
             await self._open_betty_browser()
             return
+        launch_id = None
 
-        cmd = f"start bethesdanet://run/{game_id}"
+        for game in FREE_GAMES:
+            if game_id == FREE_GAMES[game]:
+                launch_id = game_id
+
+        if not launch_id:
+            for local_id in self.local_client.local_id_cache:
+                if game_id == local_id:
+                    launch_id = self.local_client.local_id_cache[local_id]
+
+        if not launch_id:
+            log.warning(f"Couldnt find a local id to match with {game_id}")
+            await self._open_betty_browser(game_id)
+            return
+        log.info(f"Calling launch command for id {launch_id}")
+        cmd = f"start bethesdanet://run/{launch_id}"
         subprocess.Popen(cmd, shell=True)
 
     async def uninstall_game(self, game_id):
@@ -157,8 +171,11 @@ class BethesdaPlugin(Plugin):
         cmd = f"start bethesdanet://uninstall/{game_id}"
         subprocess.Popen(cmd, shell=True)
 
-    async def _open_betty_browser(self):
-        url = "https://bethesda.net/game/bethesda-launcher"
+    async def _open_betty_browser(self, game_id=None):
+        if game_id:
+            url = f"https://bethesda.net/en/games/{game_id}"
+        else:
+            url = "https://bethesda.net/game/bethesda-launcher"
         log.info(f"Opening Bethesda website on url {url}")
         webbrowser.open(url)
 

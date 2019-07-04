@@ -1,4 +1,4 @@
-
+import asyncio
 import logging as log
 
 class BethesdaClient:
@@ -12,6 +12,7 @@ class BethesdaClient:
         resp = await resp.json()
         games = resp['products']['product']
         if resp['products']['totalResultPages'] > page:
+            await asyncio.sleep(0.1)
             games += await self.get_store_games_info(page + 1)
         return games
 

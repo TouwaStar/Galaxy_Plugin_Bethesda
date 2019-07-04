@@ -5,10 +5,16 @@ from consts import BETTY_WINREG_LOCATION, BETTY_LAUNCHER_EXE, WINDOWS_UNINSTALL_
 import os
 import logging as log
 
+FREE_GAMES = {
+    'Fallout Shelter': '8',
+    'The Elder Scrolls Legends': '5',
+    'Quake Champions': '11'
+}
+
 class LocalClient(object):
     def __init__(self):
         self._is_installed = None
-        self._local_id_cache = {}
+        self.local_id_cache = {}
 
 
     @property
@@ -26,7 +32,7 @@ class LocalClient(object):
 
     @property
     def is_installed(self):
-        if sys.platform is not 'win32':
+        if sys.platform != 'win32':
             log.info("Platform is not compatible")
             return False
         try:
@@ -57,8 +63,15 @@ class LocalClient(object):
                                     if 'bethesdanet://uninstall' in winreg.QueryValueEx(subkey, 'UninstallString')[0]:
                                         unstring = winreg.QueryValueEx(subkey, "UninstallString")[0]
                                         local_id = unstring.split('bethesdanet://uninstall/')[1]
-                                        self._local_id_cache[product] = local_id
+                                        self.local_id_cache[product] = local_id
                                         installed_games.append(product)
+                            except OSError:
+                                continue
+                        for free_game in FREE_GAMES:
+                            try:
+                                if free_game in winreg.QueryValueEx(subkey, 'DisplayName')[0]:
+                                    if 'bethesdanet://uninstall' in winreg.QueryValueEx(subkey, 'UninstallString')[0]:
+                                        installed_games.append(FREE_GAMES[free_game])
                             except OSError:
                                 continue
         except OSError as e:
@@ -67,8 +80,6 @@ class LocalClient(object):
         except Exception as e:
             log.exception(f"Unexpected error when parsing registry {repr(e)}")
             raise
-
-
         return installed_games
 
 
