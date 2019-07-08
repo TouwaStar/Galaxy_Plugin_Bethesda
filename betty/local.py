@@ -2,6 +2,7 @@ import sys
 if sys.platform == 'win32':
     import winreg
     import ctypes
+import psutil
 from consts import BETTY_WINREG_LOCATION, BETTY_LAUNCHER_EXE, WINDOWS_UNINSTALL_LOCATION
 import os
 import logging as log
@@ -66,6 +67,17 @@ class LocalClient(object):
             return
 
     @property
+    def is_running(self):
+        for proc in psutil.process_iter():
+            try:
+                # Check if process name contains the given name string.
+                if "bethesdanetlauncher.exe" in proc.name().lower():
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        return False
+
+    @property
     def is_installed(self):
         # Bethesda client is not available for macOs
         if sys.platform != 'win32':
@@ -96,7 +108,7 @@ class LocalClient(object):
             return False
 
     async def get_installed_games(self, products):
-        installed_games = []
+        installed_games = {}
         products_to_scan = products.copy()
 
         try:
@@ -109,7 +121,7 @@ class LocalClient(object):
                         try:
                             winreg.OpenKey(key, self.local_games_cache[product]['registry_path'])
                             if os.path.exists(self.local_games_cache[product]['path']):
-                                installed_games.append(product)
+                                installed_games[product] = self.local_games_cache[product]['local_id']
                             products_to_scan.pop(product)
                         except OSError:
                             products_to_scan.pop(product)
@@ -122,7 +134,7 @@ class LocalClient(object):
                         for product in products_to_scan.copy():
 
                             try:
-                                if products[product]['displayName'] in winreg.QueryValueEx(subkey, 'DisplayName')[0]:
+                                if product in winreg.QueryValueEx(subkey, 'DisplayName')[0]:
                                     if 'bethesdanet://uninstall' in winreg.QueryValueEx(subkey, 'UninstallString')[0]:
                                         unstring = winreg.QueryValueEx(subkey, "UninstallString")[0]
                                         local_id = unstring.split('bethesdanet://uninstall/')[1]
@@ -130,7 +142,7 @@ class LocalClient(object):
                                         self.local_games_cache[product] = {'local_id': local_id,
                                                                         'registry_path': subkey_name,
                                                                         'path': path.strip('\"')}
-                                        installed_games.append(product)
+                                        installed_games[product] = local_id
                             except OSError:
                                 continue
         except OSError as e:

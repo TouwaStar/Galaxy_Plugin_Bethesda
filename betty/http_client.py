@@ -40,8 +40,6 @@ class AuthenticatedHttpClient(HttpClient):
     def set_auth_lost_callback(self, callback):
         self._auth_lost_callback = callback
 
-    async def close(self):
-        self._session.close()
 
     def get_credentials(self):
         creds = self.user
@@ -57,7 +55,7 @@ class AuthenticatedHttpClient(HttpClient):
         except Exception as e:
             log.warning(f"Request failed with {repr(e)}, attempting to refresh credentials")
             await self.authenticate()
-            return await self.request(args, kwargs)
+            return await self.request(method, *args, **kwargs)
 
     async def authenticate(self):
         url = "https://api.bethesda.net/dwemer/attunement/v1/authenticate"

@@ -30,10 +30,20 @@ class BethesdaClient:
             'Authorization': f"Bearer {self.http_client.bearer}",
             'Content-Type': "application/json"
         }
-        resp = await self.http_client.do_request('get','https://api.bethesda.net/dwemer/attunement/v1/entitlements/details', headers=headers)
+        resp = await self.http_client.do_request('get', "https://api.bethesda.net/dwemer/attunement/v1/entitlements/details", headers=headers)
         resp = await resp.json()
         ids = []
         for product in resp["entitlementDetails"]:
             ids.append(product["businessID"])
         return ids
 
+    async def get_game_details(self, business_id):
+        headers = {
+            'Authorization': f"Bearer 26a7d8bae3b004c1847e14418567d527e337c97440ac52113306ac6861036590",
+            'Content-Type': "application/json"
+        }
+        resp = await self.http_client.do_request('get', f"https://cdn.contentful.com/spaces/rporu91m20dc/environments/master/entries?skip=0&order=&include=3&content_type=productCode&locale=en&limit=100&fields.entitlementBusinessId={business_id}", headers=headers)
+        resp = await resp.json()
+        if 'includes' not in resp:
+            return []
+        return resp['includes']

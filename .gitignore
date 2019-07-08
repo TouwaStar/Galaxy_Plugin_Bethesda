@@ -1,0 +1,18 @@
+# debug purposes and local dev stuff
+.venv
+Pipfile
+
+# pytest
+__pycache__/
+.pytest_cache/
+
+# pyinstaller
+build/
+output/
+*.spec
+
+# pycharm
+.idea/
+
+# vscode
+.vscode/
