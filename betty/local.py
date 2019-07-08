@@ -42,11 +42,14 @@ class LocalClient(object):
 
     def clientgame_changed(self):
         clientgame = self.client_clientgame_path
-        if clientgame:
-            mtime = os.path.getmtime(clientgame)
-            if self.clientgame_modify_date != mtime:
-                self.clientgame_modify_date = mtime
-                return True
+        try:
+            if clientgame:
+                mtime = os.path.getmtime(clientgame)
+                if self.clientgame_modify_date != mtime:
+                    self.clientgame_modify_date = mtime
+                    return True
+        except (OSError, FileNotFoundError):
+            return False
         return False
 
 

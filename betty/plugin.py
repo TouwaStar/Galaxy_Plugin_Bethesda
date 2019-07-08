@@ -32,7 +32,6 @@ class BethesdaPlugin(Plugin):
         self.local_client = LocalClient()
         self.products_cache = product_cache
         self._asked_for_local = False
-        self.parse_store_games_info_task = None
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
@@ -167,15 +166,8 @@ class BethesdaPlugin(Plugin):
         subprocess.Popen(cmd, shell=True)
         self.local_client.focus_client_window()
 
-    async def _open_betty_browser(self, game_id=None):
-        if game_id:
-            reference_id = None
-            for product in self.products_cache:
-                if self.products_cache[product]['local_id'] == game_id:
-                    reference_id = self.products_cache[product]['reference_id']
-            url = f"https://bethesda.net/en/games/{reference_id}"
-        else:
-            url = "https://bethesda.net/game/bethesda-launcher"
+    async def _open_betty_browser(self):
+        url = "https://bethesda.net/game/bethesda-launcher"
         log.info(f"Opening Bethesda website on url {url}")
         webbrowser.open(url)
 
@@ -218,14 +210,13 @@ class BethesdaPlugin(Plugin):
 
         self._asked_for_local = True
 
-
     def tick(self):
         if self._asked_for_local:
             asyncio.create_task(self.update_game_installation_status())
 
-
     def shutdown(self):
         asyncio.create_task(self._http_client.close())
+
 
 def main():
     create_and_run_plugin(BethesdaPlugin, sys.argv)
