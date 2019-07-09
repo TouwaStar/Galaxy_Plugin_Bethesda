@@ -123,7 +123,7 @@ class BethesdaPlugin(Plugin):
             for installed_product in installed_products:
                 if installed_products[installed_product] == self.products_cache[product]['local_id']:
                     self.products_cache[product]['installed'] = True
-                    local_games.append(LocalGame(installed_product, LocalGameState.Installed))
+                    local_games.append(LocalGame(installed_products[installed_product], LocalGameState.Installed))
 
         self._asked_for_local = True
         log.info(f"Returning local games {local_games}")
