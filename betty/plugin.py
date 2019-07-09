@@ -77,14 +77,16 @@ class BethesdaPlugin(Plugin):
         return Authentication(user_id=user['buid'], user_name=user['username'])
 
     async def get_owned_games(self):
-        owned_ids = None
+        owned_ids = []
+        matched_ids = []
+        games_to_send = []
+        pre_orders = []
         try:
             owned_ids = await self.bethesda_client.get_owned_ids()
         except UnknownError as e:
             log.warning(f"No owned games detected {repr(e)}")
 
         log.info(f"Owned Ids: {owned_ids}")
-        matched_ids = []
 
         if owned_ids:
             for entitlement_id in owned_ids:
@@ -93,9 +95,7 @@ class BethesdaPlugin(Plugin):
                         if entitlement_id == self.products_cache[product]['reference_id']:
                             self.products_cache[product]['owned'] = True
                             matched_ids.append(entitlement_id)
-
-        pre_orders = set(owned_ids) - set(matched_ids)
-        games_to_send = []
+            pre_orders = set(owned_ids) - set(matched_ids)
 
         for pre_order in pre_orders:
             pre_order_details = await self.bethesda_client.get_game_details(pre_order)
