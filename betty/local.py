@@ -110,7 +110,7 @@ class LocalClient(object):
         except OSError:
             return False
 
-    async def get_installed_games(self, products):
+    def get_installed_games(self, products):
         installed_games = {}
         products_to_scan = products.copy()
 
@@ -128,33 +128,38 @@ class LocalClient(object):
                             products_to_scan.pop(product)
                         except OSError:
                             products_to_scan.pop(product)
-
+                log.info("Scanned through local games cache")
                 for i in range(0, winreg.QueryInfoKey(key)[0]):
                     subkey_name = winreg.EnumKey(key, i)
                     with winreg.OpenKey(key, subkey_name) as subkey:
                         # Try to find installed products retrieved by api requests,
                         # use copy because the dict can be modified by other methods since this is an async check
                         for product in products_to_scan.copy():
-
                             try:
+                                try:
+                                    winreg.QueryValueEx(subkey, 'DisplayName')[0]
+                                except:
+                                    continue
                                 if product in winreg.QueryValueEx(subkey, 'DisplayName')[0]:
                                     if 'bethesdanet://uninstall' in winreg.QueryValueEx(subkey, 'UninstallString')[0]:
                                         unstring = winreg.QueryValueEx(subkey, "UninstallString")[0]
                                         local_id = unstring.split('bethesdanet://uninstall/')[1]
                                         path = winreg.QueryValueEx(subkey, "Path")[0]
+
                                         self.local_games_cache[product] = {'local_id': local_id,
                                                                         'registry_path': subkey_name,
                                                                         'path': path.strip('\"')}
                                         installed_games[product] = local_id
-                            except OSError:
+                            except OSError as e:
+                                log.info(f"Encountered OsError while parsing through registry keys {repr(e)}")
                                 continue
-        except OSError as e:
-            log.error(f"Unable to parse registry for installed games {repr(e)}")
+        except OSError:
+            log.error(f"Unable to parse registry for installed games")
             return installed_games
-        except Exception as e:
-            log.exception(f"Unexpected error when parsing registry {repr(e)}")
+        except Exception:
+            log.exception(f"Unexpected error when parsing registry")
             raise
-
+        log.info(f"Returning {installed_games}")
         return installed_games
 
 

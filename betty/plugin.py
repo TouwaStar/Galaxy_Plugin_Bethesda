@@ -7,7 +7,7 @@ import webbrowser
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.consts import Platform
 from galaxy.api.types import NextStep, Authentication, Game, LicenseInfo, LicenseType, LocalGame, LocalGameState
-from galaxy.api.errors import InvalidCredentials
+from galaxy.api.errors import InvalidCredentials, UnknownError
 from version import __version__
 from urllib.parse import unquote
 
@@ -20,8 +20,6 @@ import pickle
 import json
 import asyncio
 
-from threading import RLock
-lock = RLock()
 
 
 class BethesdaPlugin(Plugin):
@@ -82,7 +80,7 @@ class BethesdaPlugin(Plugin):
         owned_ids = None
         try:
             owned_ids = await self.bethesda_client.get_owned_ids()
-        except Exception as e:
+        except UnknownError as e:
             log.warning(f"No owned games detected {repr(e)}")
 
         log.info(f"Owned Ids: {owned_ids}")
@@ -119,15 +117,16 @@ class BethesdaPlugin(Plugin):
 
     async def get_local_games(self):
         local_games = []
-        installed_products = await self.local_client.get_installed_games(self.products_cache)
-
+        installed_products = self.local_client.get_installed_games(self.products_cache)
+        log.info(f"Installed products {installed_products}")
         for product in self.products_cache:
             for installed_product in installed_products:
-                if installed_product == self.products_cache[product]['local_id']:
+                if installed_products[installed_product] == self.products_cache[product]['local_id']:
                     self.products_cache[product]['installed'] = True
                     local_games.append(LocalGame(installed_product, LocalGameState.Installed))
 
         self._asked_for_local = True
+        log.info(f"Returning local games {local_games}")
         return local_games
 
     async def install_game(self, game_id):
@@ -172,7 +171,7 @@ class BethesdaPlugin(Plugin):
         webbrowser.open(url)
 
     async def _heavy_installation_status_check(self):
-        installed_products = await self.local_client.get_installed_games(self.products_cache)
+        installed_products = self.local_client.get_installed_games(self.products_cache)
         products_cache_installed_products = {}
 
         for product in self.products_cache:
