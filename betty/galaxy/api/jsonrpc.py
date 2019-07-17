@@ -5,6 +5,8 @@ import logging
 import inspect
 import json
 
+from galaxy.reader import StreamLineReader
+
 class JsonRpcError(Exception):
     def __init__(self, code, message, data=None):
         self.code = code
@@ -67,13 +69,12 @@ def anonymise_sensitive_params(params, sensitive_params):
 class Server():
     def __init__(self, reader, writer, encoder=json.JSONEncoder()):
         self._active = True
-        self._reader = reader
+        self._reader = StreamLineReader(reader)
         self._writer = writer
         self._encoder = encoder
         self._methods = {}
         self._notifications = {}
         self._eof_listeners = []
-        self._input_buffer = bytes()
 
     def register_method(self, name, callback, internal, sensitive_params=False):
         """
@@ -105,7 +106,7 @@ class Server():
     async def run(self):
         while self._active:
             try:
-                data = await self._readline()
+                data = await self._reader.readline()
                 if not data:
                     self._eof()
                     continue
@@ -115,21 +116,7 @@ class Server():
             data = data.strip()
             logging.debug("Received %d bytes of data", len(data))
             self._handle_input(data)
-
-    async def _readline(self):
-        """Like StreamReader.readline but without limit"""
-        while True:
-            chunk = await self._reader.read(1024)
-            if not chunk:
-                return chunk
-            previous_size = len(self._input_buffer)
-            self._input_buffer += chunk
-            it = self._input_buffer.find(b"\n", previous_size)
-            if it < 0:
-                continue
-            line = self._input_buffer[:it]
-            self._input_buffer = self._input_buffer[it+1:]
-            return line
+            await asyncio.sleep(0) # To not starve task queue
 
     def stop(self):
         self._active = False

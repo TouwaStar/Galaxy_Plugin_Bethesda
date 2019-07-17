@@ -140,7 +140,7 @@ class LocalClient(object):
                                     winreg.QueryValueEx(subkey, 'DisplayName')[0]
                                 except:
                                     continue
-                                if product in winreg.QueryValueEx(subkey, 'DisplayName')[0]:
+                                if product in winreg.QueryValueEx(subkey, 'DisplayName')[0] or product.replace(':', '') in winreg.QueryValueEx(subkey, 'DisplayName')[0]:
                                     if 'bethesdanet://uninstall' in winreg.QueryValueEx(subkey, 'UninstallString')[0]:
                                         unstring = winreg.QueryValueEx(subkey, "UninstallString")[0]
                                         local_id = unstring.split('bethesdanet://uninstall/')[1]
