@@ -1,11 +1,11 @@
 import sys
 if sys.platform == 'win32':
     import winreg
-    import ctypes
 import psutil
 from consts import BETTY_WINREG_LOCATION, BETTY_LAUNCHER_EXE, WINDOWS_UNINSTALL_LOCATION
 import os
 import logging as log
+import subprocess
 
 class LocalClient(object):
     def __init__(self):
@@ -52,22 +52,12 @@ class LocalClient(object):
             return False
         return False
 
-
-    @staticmethod
-    def focus_client_window():
+    def focus_client_window(self):
         if sys.platform != 'win32':
-            log.info("Platform is not compatible")
+            log.error(f"Incompatible platform {sys.platform}")
             return
-        try:
-            betty_window = ctypes.windll.user32.FindWindowW(None, "Bethesda.net Launcher")
-            if not betty_window:
-                log.info("Bethesda client not running")
-                return
-            log.info(f"Focusing window {betty_window}")
-            ctypes.windll.user32.ShowWindow(betty_window, 1)
-        except Exception as e:
-            log.error(f"Unable to focus client window: {repr(e)}")
-            return
+
+        subprocess.Popen(self.client_exe_path)
 
     @property
     def is_running(self):

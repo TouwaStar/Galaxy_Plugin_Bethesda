@@ -1,4 +1,5 @@
 import sys
+import asyncio
 
 import logging as log
 import subprocess
@@ -19,7 +20,6 @@ from game_cache import product_cache
 import pickle
 import json
 import asyncio
-
 
 
 class BethesdaPlugin(Plugin):
@@ -130,6 +130,10 @@ class BethesdaPlugin(Plugin):
         return local_games
 
     async def install_game(self, game_id):
+        if sys.platform != 'win32':
+            log.error(f"Incompatible platform {sys.platform}")
+            return
+
         if not self.local_client.is_installed:
             await self._open_betty_browser()
             return
@@ -140,30 +144,57 @@ class BethesdaPlugin(Plugin):
         else:
             uuid = None
             for product in self.products_cache:
+
                 if self.products_cache[product]['local_id'] == game_id:
+                    if self.products_cache[product]['installed']:
+                        log.warning("Received install command for a game that is already installed, launching instead")
+                        return await self.launch_game(game_id)
                     uuid = "\"" + self.products_cache[product]['uuid'] + "\""
             cmd = "\"" + self.local_client.client_exe_path + "\"" + f" --installproduct={uuid}"
             log.info(f"Calling install game with command {cmd}")
             subprocess.Popen(cmd, shell=True)
 
     async def launch_game(self, game_id):
+        if sys.platform != 'win32':
+            log.error(f"Incompatible platform {sys.platform}")
+            return
         if not self.local_client.is_installed:
             await self._open_betty_browser()
             return
+
+        if not self.local_client.is_running:
+            for product in self.products_cache:
+                if self.products_cache[product]['local_id'] == game_id:
+                    if not self.products_cache[product]['installed']:
+                        log.warning("Received launch command for a game that is not installed, installing instead")
+                        return await self.install_game(game_id)
 
         log.info(f"Calling launch command for id {game_id}")
         cmd = f"start bethesdanet://run/{game_id}"
         subprocess.Popen(cmd, shell=True)
 
     async def uninstall_game(self, game_id):
+        if sys.platform != 'win32':
+            log.error(f"Incompatible platform {sys.platform}")
+            return
+
         if not self.local_client.is_installed:
             await self._open_betty_browser()
             return
 
+        for product in self.products_cache:
+            if self.products_cache[product]['local_id'] == game_id:
+                if not self.products_cache[product]['installed']:
+                    return
+
         log.info(f"Calling uninstall command for id {game_id}")
         cmd = f"start bethesdanet://uninstall/{game_id}"
+
         subprocess.Popen(cmd, shell=True)
-        self.local_client.focus_client_window()
+
+        if self.local_client.is_running:
+            await asyncio.sleep(2)  # QOL, bethesda slowly reacts to uninstall command,
+            self.local_client.focus_client_window()
 
     async def _open_betty_browser(self):
         url = "https://bethesda.net/game/bethesda-launcher"
