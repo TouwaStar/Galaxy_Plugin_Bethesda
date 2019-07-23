@@ -3,6 +3,7 @@ if sys.platform == 'win32':
     import winreg
 import psutil
 from consts import BETTY_WINREG_LOCATION, BETTY_LAUNCHER_EXE, WINDOWS_UNINSTALL_LOCATION
+from pathlib import Path
 import os
 import logging as log
 import subprocess
@@ -56,7 +57,6 @@ class LocalClient(object):
         if sys.platform != 'win32':
             log.error(f"Incompatible platform {sys.platform}")
             return
-
         subprocess.Popen(self.client_exe_path)
 
     @property
@@ -100,6 +100,20 @@ class LocalClient(object):
         except OSError:
             return False
 
+    @staticmethod
+    def find_executables(folder):
+        folder = Path(folder)
+        execs = []
+        if not folder.exists():
+            log.error(f"{folder} does not exist!")
+            return []
+        for root, dirs, files in os.walk(folder):
+            for path in files:
+                whole_path = os.path.join(root, path)
+                if path.endswith('.exe'):
+                    execs.append(whole_path.lower())
+        return execs
+
     def get_installed_games(self, products):
         installed_games = {}
         products_to_scan = products.copy()
@@ -134,11 +148,12 @@ class LocalClient(object):
                                     if 'bethesdanet://uninstall' in winreg.QueryValueEx(subkey, 'UninstallString')[0]:
                                         unstring = winreg.QueryValueEx(subkey, "UninstallString")[0]
                                         local_id = unstring.split('bethesdanet://uninstall/')[1]
-                                        path = winreg.QueryValueEx(subkey, "Path")[0]
-
+                                        path = winreg.QueryValueEx(subkey, "Path")[0].strip('\"')
+                                        executables = self.find_executables(path)
                                         self.local_games_cache[product] = {'local_id': local_id,
                                                                         'registry_path': subkey_name,
-                                                                        'path': path.strip('\"')}
+                                                                        'path': path,
+                                                                        'execs': executables}
                                         installed_games[product] = local_id
                             except OSError as e:
                                 log.info(f"Encountered OsError while parsing through registry keys {repr(e)}")
@@ -151,6 +166,7 @@ class LocalClient(object):
             raise
         log.info(f"Returning {installed_games}")
         return installed_games
+
 
 
 

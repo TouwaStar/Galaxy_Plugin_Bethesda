@@ -4,6 +4,7 @@ import asyncio
 import logging as log
 import subprocess
 import webbrowser
+import psutil
 
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.consts import Platform
@@ -17,9 +18,11 @@ from backend import BethesdaClient
 from http_client import AuthenticatedHttpClient
 from local import LocalClient
 from game_cache import product_cache
+
 import pickle
 import json
 import asyncio
+import time
 
 
 class BethesdaPlugin(Plugin):
@@ -30,6 +33,10 @@ class BethesdaPlugin(Plugin):
         self.local_client = LocalClient()
         self.products_cache = product_cache
         self._asked_for_local = False
+        self.update_game_running_status_task = None
+        self.update_game_installation_status_task = None
+        self.running_games = {}
+        self.launching_lock = None
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
@@ -92,7 +99,7 @@ class BethesdaPlugin(Plugin):
             for entitlement_id in owned_ids:
                 for product in self.products_cache:
                     if 'reference_id' in self.products_cache[product]:
-                        if entitlement_id == self.products_cache[product]['reference_id']:
+                        if entitlement_id[0:5] == self.products_cache[product]['reference_id'][0:5]:
                             self.products_cache[product]['owned'] = True
                             matched_ids.append(entitlement_id)
             pre_orders = set(owned_ids) - set(matched_ids)
@@ -147,7 +154,7 @@ class BethesdaPlugin(Plugin):
 
                 if self.products_cache[product]['local_id'] == game_id:
                     if self.products_cache[product]['installed']:
-                        log.warning("Received install command for a game that is already installed, launching instead")
+                        log.warning("Got install on already installed game, launching")
                         return await self.launch_game(game_id)
                     uuid = "\"" + self.products_cache[product]['uuid'] + "\""
             cmd = "\"" + self.local_client.client_exe_path + "\"" + f" --installproduct={uuid}"
@@ -162,16 +169,28 @@ class BethesdaPlugin(Plugin):
             await self._open_betty_browser()
             return
 
-        if not self.local_client.is_running:
-            for product in self.products_cache:
-                if self.products_cache[product]['local_id'] == game_id:
-                    if not self.products_cache[product]['installed']:
-                        log.warning("Received launch command for a game that is not installed, installing instead")
+        for product in self.products_cache:
+            if self.products_cache[product]['local_id'] == game_id:
+                if not self.products_cache[product]['installed']:
+                    if not self.local_client.is_running:
+                        log.warning("Got launch on a not installed game, installing")
                         return await self.install_game(game_id)
+                else:
+                    if not self.local_client.is_running:
+                        self.launching_lock = time.time() + 45
+                    else:
+                        self.launching_lock = time.time() + 30
+                    self.running_games[game_id] = None
+                    self.update_local_game_status(
+                        LocalGame(game_id, LocalGameState.Installed | LocalGameState.Running))
+                    self.update_game_running_status_task.cancel()
 
         log.info(f"Calling launch command for id {game_id}")
         cmd = f"start bethesdanet://run/{game_id}"
         subprocess.Popen(cmd, shell=True)
+
+
+
 
     async def uninstall_game(self, game_id):
         if sys.platform != 'win32':
@@ -230,7 +249,6 @@ class BethesdaPlugin(Plugin):
                 self.update_local_game_status(LocalGame(self.local_client.local_games_cache[local_game]['local_id'], LocalGameState.None_))
 
     async def update_game_installation_status(self):
-        self._asked_for_local = False
 
         if self.local_client.clientgame_changed():
             await asyncio.sleep(1)
@@ -238,11 +256,56 @@ class BethesdaPlugin(Plugin):
         else:
             self._light_installation_status_check()
 
-        self._asked_for_local = True
+    async def update_game_running_status(self):
+
+        process_iter_interval = 0.10
+        dont_downgrade_status = False
+
+        if self.launching_lock and self.launching_lock >= time.time():
+            dont_downgrade_status = True
+            process_iter_interval = 0.01
+
+        for running_game in self.running_games.copy():
+            if not self.running_games[running_game] and dont_downgrade_status:
+                log.info(f"Found 'just launched' game {running_game}")
+                continue
+            elif not self.running_games[running_game]:
+                log.info(f"Found 'just launched' game but its still without pid and its time run out {running_game}")
+                self.running_games.pop(running_game)
+                self.update_local_game_status(
+                    LocalGame(running_game, LocalGameState.Installed))
+                continue
+
+            if self.running_games[running_game].is_running():
+                return
+            self.running_games.pop(running_game)
+            self.update_local_game_status(
+                LocalGame(running_game, LocalGameState.Installed))
+
+        for process in psutil.process_iter(attrs=['exe'], ad_value=''):
+            await asyncio.sleep(process_iter_interval)
+            for local_game in self.local_client.local_games_cache:
+                try:
+                    if process.exe().lower() in self.local_client.local_games_cache[local_game]['execs']:
+                        log.info(f"Found a running game! {local_game}")
+                        local_id = self.local_client.local_games_cache[local_game]['local_id']
+                        if local_id not in self.running_games:
+                            self.update_local_game_status(LocalGame(local_id, LocalGameState.Installed | LocalGameState.Running))
+                        self.running_games[local_id] = process
+                        return
+                except (psutil.AccessDenied, psutil.NoSuchProcess):
+                    break
+
+        await asyncio.sleep(3)
+
 
     def tick(self):
-        if self._asked_for_local:
-            asyncio.create_task(self.update_game_installation_status())
+
+        if self._asked_for_local and (not self.update_game_installation_status_task or self.update_game_installation_status_task.done()):
+            self.update_game_installation_status_task = asyncio.create_task(self.update_game_installation_status())
+
+        if self._asked_for_local and (not self.update_game_running_status_task or self.update_game_running_status_task.done()):
+            self.update_game_running_status_task = asyncio.create_task(self.update_game_running_status())
 
     def shutdown(self):
         asyncio.create_task(self._http_client.close())
