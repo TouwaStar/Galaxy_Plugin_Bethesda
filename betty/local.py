@@ -111,7 +111,7 @@ class LocalClient(object):
             for path in files:
                 whole_path = os.path.join(root, path)
                 if path.endswith('.exe'):
-                    execs.append(whole_path.lower())
+                    execs.append(whole_path.lower().split('\\')[-1])
         return execs
 
     def get_installed_games(self, products):

@@ -32,9 +32,13 @@ class BethesdaPlugin(Plugin):
         self.bethesda_client = BethesdaClient(self._http_client)
         self.local_client = LocalClient()
         self.products_cache = product_cache
+        self.owned_games_cache = None
+
         self._asked_for_local = False
+
         self.update_game_running_status_task = None
         self.update_game_installation_status_task = None
+        self.check_for_new_games_task = None
         self.running_games = {}
         self.launching_lock = None
 
@@ -119,7 +123,7 @@ class BethesdaPlugin(Plugin):
                 games_to_send.append(Game(self.products_cache[product]['local_id'], product, None, LicenseInfo(LicenseType.SinglePurchase)))
 
         log.info(f"Games to send (with free games): {games_to_send}")
-
+        self.owned_games_cache = games_to_send
         return games_to_send
 
     async def get_local_games(self):
@@ -282,11 +286,11 @@ class BethesdaPlugin(Plugin):
             self.update_local_game_status(
                 LocalGame(running_game, LocalGameState.Installed))
 
-        for process in psutil.process_iter(attrs=['exe'], ad_value=''):
+        for process in psutil.process_iter(attrs=['name'], ad_value=''):
             await asyncio.sleep(process_iter_interval)
             for local_game in self.local_client.local_games_cache:
                 try:
-                    if process.exe().lower() in self.local_client.local_games_cache[local_game]['execs']:
+                    if process.name().lower() in self.local_client.local_games_cache[local_game]['execs']:
                         log.info(f"Found a running game! {local_game}")
                         local_id = self.local_client.local_games_cache[local_game]['local_id']
                         if local_id not in self.running_games:
@@ -298,6 +302,13 @@ class BethesdaPlugin(Plugin):
 
         await asyncio.sleep(3)
 
+    async def check_for_new_games(self):
+        owned_games = await self.get_owned_games()
+        for owned_game in owned_games:
+            if owned_game not in self.owned_games_cache:
+                self.add_game(owned_game)
+        self.owned_games_cache = owned_games
+        await asyncio.sleep(60)
 
     def tick(self):
 
@@ -306,6 +317,9 @@ class BethesdaPlugin(Plugin):
 
         if self._asked_for_local and (not self.update_game_running_status_task or self.update_game_running_status_task.done()):
             self.update_game_running_status_task = asyncio.create_task(self.update_game_running_status())
+
+        if self.owned_games_cache and (not self.check_for_new_games_task or self.check_for_new_games_task.done()):
+            self.check_for_new_games_task = asyncio.create_task(self.check_for_new_games())
 
     def shutdown(self):
         asyncio.create_task(self._http_client.close())
