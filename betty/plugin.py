@@ -113,7 +113,10 @@ class BethesdaPlugin(Plugin):
             if pre_order_details and 'Entry' in pre_order_details:
                 for entry in pre_order_details['Entry']:
                     if 'fields' in entry and 'productName' in entry['fields']:
-                        games_to_send.append(Game(pre_order, entry['fields']['productName']+" (Pre Order)", None, LicenseInfo(LicenseType.SinglePurchase)))
+                        if entry['fields']['productName'] in self.products_cache:
+                            self.products_cache[entry['fields']['productName']]['owned'] = True
+                        else:
+                            games_to_send.append(Game(pre_order, entry['fields']['productName']+" (Pre Order)", None, LicenseInfo(LicenseType.SinglePurchase)))
                         break
 
         for product in self.products_cache:
