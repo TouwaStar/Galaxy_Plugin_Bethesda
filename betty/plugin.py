@@ -94,9 +94,10 @@ class BethesdaPlugin(Plugin):
             for entitlement_id in owned_ids:
                 for product in self.products_cache:
                     if 'reference_id' in self.products_cache[product]:
-                        if entitlement_id[0:5] == self.products_cache[product]['reference_id'][0:5]:
-                            self.products_cache[product]['owned'] = True
-                            matched_ids.append(entitlement_id)
+                        for reference_id in self.products_cache[product]['reference_id']:
+                            if entitlement_id[0:5] == reference_id[0:5]:
+                                self.products_cache[product]['owned'] = True
+                                matched_ids.append(entitlement_id)
             pre_orders = set(owned_ids) - set(matched_ids)
 
         for pre_order in pre_orders:
