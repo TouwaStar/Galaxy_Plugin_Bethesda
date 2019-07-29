@@ -5,7 +5,8 @@ import aiohttp
 import logging as log
 from yarl import URL
 import pickle
-
+import base64
+import json
 
 class CookieJar(aiohttp.CookieJar):
     def __init__(self):
@@ -67,7 +68,14 @@ class AuthenticatedHttpClient(HttpClient):
             log.error(repr(e))
             raise
         self.bearer = resp['idToken']
+        middle_token_part = self.bearer.split('.')[1]+"=="
+        decoded_token = base64.b64decode(middle_token_part)
+        user_info_json = json.loads(decoded_token.decode("utf-8"))
+        display_name = user_info_json['username']
+        user_id = user_info_json['id']
+        self.user = {'display_name': display_name, 'user_id': user_id}
         self._store_credentials(self.get_credentials())
+        return self.user
 
 
 

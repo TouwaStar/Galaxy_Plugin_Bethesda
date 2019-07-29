@@ -56,36 +56,27 @@ class BethesdaPlugin(Plugin):
                     self._http_client.update_cookies({cookie.key: cookie.value})
                 cookies_parsed.append(cookie.key)
 
-            user = {'buid': stored_credentials['buid'],
-                    'username': stored_credentials['username']}
-
-            self._http_client.user = user
             log.info("Finished parsing stored credentials, authenticating")
-            await self._http_client.authenticate()
+            user = await self._http_client.authenticate()
 
-            return Authentication(user_id=user['buid'], user_name=user['username'])
+            return Authentication(user_id=user['user_id'], user_name=user['display_name'])
         except Exception as e:
             log.error(f"Couldn't authenticate with stored credentials {repr(e)}")
             raise InvalidCredentials()
 
     async def pass_login_credentials(self, step, credentials, cookies):
-        user = None
         cookiez = {}
         for cookie in cookies:
-            if cookie['name'] == 'bnet-username':
-                user = json.loads(unquote(cookie['value']))
             cookiez[cookie['name']] = cookie['value']
-
         self._http_client.update_cookies(cookiez)
 
         try:
-            self._http_client.user = user
-            await self._http_client.authenticate()
+            user = await self._http_client.authenticate()
         except Exception as e:
             log.error(repr(e))
             raise InvalidCredentials()
 
-        return Authentication(user_id=user['buid'], user_name=user['username'])
+        return Authentication(user_id=user['user_id'], user_name=user['display_name'])
 
     async def get_owned_games(self):
         owned_ids = []
