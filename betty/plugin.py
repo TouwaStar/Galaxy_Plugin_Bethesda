@@ -1,5 +1,4 @@
 import sys
-import asyncio
 
 import logging as log
 import subprocess
@@ -8,10 +7,9 @@ import psutil
 
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.consts import Platform
-from galaxy.api.types import NextStep, Authentication, Game, LicenseInfo, LicenseType, LocalGame, LocalGameState
+from galaxy.api.types import NextStep, Authentication, Game, LicenseInfo, LicenseType, LocalGame, LocalGameState, Cookie
 from galaxy.api.errors import InvalidCredentials, UnknownError
 from version import __version__
-from urllib.parse import unquote
 
 from consts import AUTH_PARAMS
 from backend import BethesdaClient
@@ -20,7 +18,6 @@ from local import LocalClient
 from game_cache import product_cache
 
 import pickle
-import json
 import asyncio
 import time
 
@@ -44,7 +41,7 @@ class BethesdaPlugin(Plugin):
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
-            return NextStep("web_session", AUTH_PARAMS)
+            return NextStep("web_session", AUTH_PARAMS, cookies=[Cookie("passedICO", "true", ".bethesda.net")])
         try:
             log.info("Got stored credentials")
             cookies = pickle.loads(bytes.fromhex(stored_credentials['cookie_jar']))
