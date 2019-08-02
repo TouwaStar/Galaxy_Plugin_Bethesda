@@ -295,11 +295,11 @@ class BethesdaPlugin(Plugin):
         await asyncio.sleep(3)
 
     async def check_for_new_games(self):
+        games_cache = self.owned_games_cache
         owned_games = await self.get_owned_games()
         for owned_game in owned_games:
-            if owned_game not in self.owned_games_cache:
+            if owned_game not in games_cache:
                 self.add_game(owned_game)
-        self.owned_games_cache = owned_games
         await asyncio.sleep(60)
 
     def tick(self):
