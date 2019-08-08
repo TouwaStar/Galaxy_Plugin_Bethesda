@@ -114,50 +114,64 @@ class LocalClient(object):
                     execs.append(whole_path.lower().split('\\')[-1])
         return execs
 
-    def get_installed_games(self, products):
+    def _check_cached_games(self, products):
         installed_games = {}
-        products_to_scan = products.copy()
+        products_for_further_scanning = products.copy()
+        reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
+        with winreg.OpenKey(reg, WINDOWS_UNINSTALL_LOCATION) as key:
+
+            # Do a quicker, easier exclude for items which are already in the cache
+            for product in products.copy():
+                if product in self.local_games_cache:
+                    try:
+                        winreg.OpenKey(key, self.local_games_cache[product]['registry_path'])
+                        if os.path.exists(self.local_games_cache[product]['path']):
+                            installed_games[product] = self.local_games_cache[product]['local_id']
+                        products_for_further_scanning.pop(product)
+                    except OSError:
+                        products_for_further_scanning.pop(product)
+        return installed_games, products_for_further_scanning
+
+    def _scan_games_registry_keys(self, products, winreg_uninstall_key, winreg_uninstall_key_name):
+        # Try to find installed products retrieved by api requests,
+        # use copy because the dict can be modified by other methods since this is an async check
+        installed_games = {}
+        for product in products.copy():
+            try:
+                try:
+                    winreg.QueryValueEx(winreg_uninstall_key, 'DisplayName')[0]
+                except:
+                    continue
+                if product in winreg.QueryValueEx(winreg_uninstall_key, 'DisplayName')[0] or product.replace(':', '') in \
+                        winreg.QueryValueEx(winreg_uninstall_key, 'DisplayName')[0]:
+                    if 'bethesdanet://uninstall' in winreg.QueryValueEx(winreg_uninstall_key, 'UninstallString')[0]:
+                        unstring = winreg.QueryValueEx(winreg_uninstall_key, "UninstallString")[0]
+                        local_id = unstring.split('bethesdanet://uninstall/')[1]
+                        path = winreg.QueryValueEx(winreg_uninstall_key, "Path")[0].strip('\"')
+                        executables = self.find_executables(path)
+                        self.local_games_cache[product] = {'local_id': local_id,
+                                                           'registry_path': winreg_uninstall_key_name,
+                                                           'path': path,
+                                                           'execs': executables}
+                        installed_games[product] = local_id
+            except OSError as e:
+                log.info(f"Encountered OsError while parsing through registry keys {repr(e)}")
+                continue
+        return installed_games
+
+    def get_installed_games(self, products):
+        installed_games, products_to_scan = self._check_cached_games(products)
 
         try:
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
             with winreg.OpenKey(reg, WINDOWS_UNINSTALL_LOCATION) as key:
 
-                # Do a quicker, easier exclude for items which are already in the cache
-                for product in products_to_scan.copy():
-                    if product in self.local_games_cache:
-                        try:
-                            winreg.OpenKey(key, self.local_games_cache[product]['registry_path'])
-                            if os.path.exists(self.local_games_cache[product]['path']):
-                                installed_games[product] = self.local_games_cache[product]['local_id']
-                            products_to_scan.pop(product)
-                        except OSError:
-                            products_to_scan.pop(product)
                 log.info("Scanned through local games cache")
                 for i in range(0, winreg.QueryInfoKey(key)[0]):
                     subkey_name = winreg.EnumKey(key, i)
                     with winreg.OpenKey(key, subkey_name) as subkey:
-                        # Try to find installed products retrieved by api requests,
-                        # use copy because the dict can be modified by other methods since this is an async check
-                        for product in products_to_scan.copy():
-                            try:
-                                try:
-                                    winreg.QueryValueEx(subkey, 'DisplayName')[0]
-                                except:
-                                    continue
-                                if product in winreg.QueryValueEx(subkey, 'DisplayName')[0] or product.replace(':', '') in winreg.QueryValueEx(subkey, 'DisplayName')[0]:
-                                    if 'bethesdanet://uninstall' in winreg.QueryValueEx(subkey, 'UninstallString')[0]:
-                                        unstring = winreg.QueryValueEx(subkey, "UninstallString")[0]
-                                        local_id = unstring.split('bethesdanet://uninstall/')[1]
-                                        path = winreg.QueryValueEx(subkey, "Path")[0].strip('\"')
-                                        executables = self.find_executables(path)
-                                        self.local_games_cache[product] = {'local_id': local_id,
-                                                                        'registry_path': subkey_name,
-                                                                        'path': path,
-                                                                        'execs': executables}
-                                        installed_games[product] = local_id
-                            except OSError as e:
-                                log.info(f"Encountered OsError while parsing through registry keys {repr(e)}")
-                                continue
+                        found_games = self._scan_games_registry_keys(products, subkey, subkey_name)
+                        installed_games = {**installed_games, **found_games}
         except OSError:
             log.error(f"Unable to parse registry for installed games")
             return installed_games

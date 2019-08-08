@@ -8,7 +8,7 @@ AUTH_REDIRECT_URL = r"radiant/v1/graphql"
 BETTY_WINREG_LOCATION = "SOFTWARE\\Bethesda Softworks\\Bethesda.net"
 BETTY_LAUNCHER_EXE = "BethesdaNetLauncher.exe"
 
-WINDOWS_UNINSTALL_LOCATION = "SOFTWARE\\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+WINDOWS_UNINSTALL_LOCATION = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
 
 def regex_pattern(regex):
     return ".*" + re.escape(regex) + ".*"

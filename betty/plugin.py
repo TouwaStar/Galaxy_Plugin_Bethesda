@@ -75,44 +75,59 @@ class BethesdaPlugin(Plugin):
 
         return Authentication(user_id=user['user_id'], user_name=user['display_name'])
 
+    def _check_for_owned_products(self, owned_ids):
+        products_to_consider = [product for product in self.products_cache if
+                                'reference_id' in self.products_cache[product]]
+        owned_product_ids = []
+
+        for entitlement_id in owned_ids:
+            for product in products_to_consider:
+                for reference_id in self.products_cache[product]['reference_id']:
+                    if entitlement_id in reference_id:
+                        self.products_cache[product]['owned'] = True
+                        owned_product_ids.append(entitlement_id)
+        return owned_product_ids
+
+    async def _get_owned_pre_orders(self, pre_order_ids):
+        games_to_send = []
+        for pre_order in pre_order_ids:
+            pre_order_details = await self.bethesda_client.get_game_details(pre_order)
+            if pre_order_details and 'Entry' in pre_order_details:
+                entries_to_consider = [entry for entry in pre_order_details['Entry']
+                                       if 'fields' in entry and 'productName' in entry['fields']]
+                for entry in entries_to_consider:
+                    if entry['fields']['productName'] in self.products_cache:
+                        self.products_cache[entry['fields']['productName']]['owned'] = True
+                    else:
+                        games_to_send.append(Game(pre_order, entry['fields']['productName'] +
+                                                  " (Pre Order)", None, LicenseInfo(LicenseType.SinglePurchase)))
+                    break
+        return games_to_send
+
+    def _get_owned_games(self):
+        games_to_send = []
+        for product in self.products_cache:
+            if self.products_cache[product]["owned"] and self.products_cache[product]["free_to_play"]:
+                games_to_send.append(Game(self.products_cache[product]['local_id'], product, None, LicenseInfo(LicenseType.FreeToPlay)))
+            elif self.products_cache[product]["owned"]:
+                games_to_send.append(Game(self.products_cache[product]['local_id'], product, None, LicenseInfo(LicenseType.SinglePurchase)))
+        return games_to_send
+
     async def get_owned_games(self):
         owned_ids = []
-        matched_ids = []
         games_to_send = []
-        pre_orders = []
+
         try:
             owned_ids = await self.bethesda_client.get_owned_ids()
         except UnknownError as e:
             log.warning(f"No owned games detected {repr(e)}")
 
         log.info(f"Owned Ids: {owned_ids}")
+        product_ids = self._check_for_owned_products(owned_ids)
+        pre_order_ids = set(owned_ids) - set(product_ids)
 
-        if owned_ids:
-            for entitlement_id in owned_ids:
-                for product in self.products_cache:
-                    if 'reference_id' in self.products_cache[product]:
-                        for reference_id in self.products_cache[product]['reference_id']:
-                            if entitlement_id in reference_id:
-                                self.products_cache[product]['owned'] = True
-                                matched_ids.append(entitlement_id)
-            pre_orders = set(owned_ids) - set(matched_ids)
-
-        for pre_order in pre_orders:
-            pre_order_details = await self.bethesda_client.get_game_details(pre_order)
-            if pre_order_details and 'Entry' in pre_order_details:
-                for entry in pre_order_details['Entry']:
-                    if 'fields' in entry and 'productName' in entry['fields']:
-                        if entry['fields']['productName'] in self.products_cache:
-                            self.products_cache[entry['fields']['productName']]['owned'] = True
-                        else:
-                            games_to_send.append(Game(pre_order, entry['fields']['productName']+" (Pre Order)", None, LicenseInfo(LicenseType.SinglePurchase)))
-                        break
-
-        for product in self.products_cache:
-            if self.products_cache[product]["owned"] and self.products_cache[product]["free_to_play"]:
-                games_to_send.append(Game(self.products_cache[product]['local_id'], product, None, LicenseInfo(LicenseType.FreeToPlay)))
-            elif self.products_cache[product]["owned"]:
-                games_to_send.append(Game(self.products_cache[product]['local_id'], product, None, LicenseInfo(LicenseType.SinglePurchase)))
+        games_to_send.extend(await self._get_owned_pre_orders(pre_order_ids))
+        games_to_send.extend(self._get_owned_games())
 
         log.info(f"Games to send (with free games): {games_to_send}")
         self.owned_games_cache = games_to_send
@@ -252,15 +267,7 @@ class BethesdaPlugin(Plugin):
         else:
             self._light_installation_status_check()
 
-    async def update_game_running_status(self):
-
-        process_iter_interval = 0.10
-        dont_downgrade_status = False
-
-        if self.launching_lock and self.launching_lock >= time.time():
-            dont_downgrade_status = True
-            process_iter_interval = 0.01
-
+    def _update_status_of_already_running_games(self, dont_downgrade_status):
         for running_game in self.running_games.copy():
             if not self.running_games[running_game] and dont_downgrade_status:
                 log.info(f"Found 'just launched' game {running_game}")
@@ -278,19 +285,28 @@ class BethesdaPlugin(Plugin):
             self.update_local_game_status(
                 LocalGame(running_game, LocalGameState.Installed))
 
+    async def update_game_running_status(self):
+
+        process_iter_interval = 0.10
+        dont_downgrade_status = False
+
+        if self.launching_lock and self.launching_lock >= time.time():
+            dont_downgrade_status = True
+            process_iter_interval = 0.01
+
+        self._update_status_of_already_running_games(dont_downgrade_status)
+
         for process in psutil.process_iter(attrs=['name'], ad_value=''):
             await asyncio.sleep(process_iter_interval)
             for local_game in self.local_client.local_games_cache:
-                try:
-                    if process.name().lower() in self.local_client.local_games_cache[local_game]['execs']:
-                        log.info(f"Found a running game! {local_game}")
-                        local_id = self.local_client.local_games_cache[local_game]['local_id']
-                        if local_id not in self.running_games:
-                            self.update_local_game_status(LocalGame(local_id, LocalGameState.Installed | LocalGameState.Running))
-                        self.running_games[local_id] = process
-                        return
-                except (psutil.AccessDenied, psutil.NoSuchProcess):
-                    break
+                if process.info['name'].lower() in self.local_client.local_games_cache[local_game]['execs']:
+                    log.info(f"Found a running game! {local_game}")
+                    local_id = self.local_client.local_games_cache[local_game]['local_id']
+                    if local_id not in self.running_games:
+                        self.update_local_game_status(LocalGame(local_id,
+                                                                LocalGameState.Installed | LocalGameState.Running))
+                    self.running_games[local_id] = process
+                    return
 
         await asyncio.sleep(3)
 
