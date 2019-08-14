@@ -70,7 +70,7 @@ class AuthenticatedHttpClient(HttpClient):
         self.bearer = resp['idToken']
         middle_token_part = self.bearer.split('.')[1]+"=="
         decoded_token = base64.b64decode(middle_token_part)
-        user_info_json = json.loads(decoded_token.decode("utf-8"))
+        user_info_json = json.loads(decoded_token.decode("utf-8", "ignore"))
         display_name = user_info_json['username']
         user_id = user_info_json['id']
         self.user = {'display_name': display_name, 'user_id': user_id}
