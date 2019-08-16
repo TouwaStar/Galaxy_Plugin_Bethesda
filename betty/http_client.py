@@ -7,7 +7,6 @@ from yarl import URL
 import pickle
 import base64
 import json
-from json import JSONDecodeError
 
 class CookieJar(aiohttp.CookieJar):
     def __init__(self):
