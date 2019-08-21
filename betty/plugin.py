@@ -134,6 +134,9 @@ class BethesdaPlugin(Plugin):
         return games_to_send
 
     async def get_local_games(self):
+        if sys.platform != 'win32':
+            log.error(f"Incompatible platform {sys.platform}")
+            return []
         local_games = []
         installed_products = self.local_client.get_installed_games(self.products_cache)
         log.info(f"Installed products {installed_products}")
@@ -199,9 +202,6 @@ class BethesdaPlugin(Plugin):
         log.info(f"Calling launch command for id {game_id}")
         cmd = f"start bethesdanet://run/{game_id}"
         subprocess.Popen(cmd, shell=True)
-
-
-
 
     async def uninstall_game(self, game_id):
         if sys.platform != 'win32':
@@ -320,11 +320,12 @@ class BethesdaPlugin(Plugin):
 
     def tick(self):
 
-        if self._asked_for_local and (not self.update_game_installation_status_task or self.update_game_installation_status_task.done()):
-            self.update_game_installation_status_task = asyncio.create_task(self.update_game_installation_status())
+        if sys.platform == 'win32':
+            if self._asked_for_local and (not self.update_game_installation_status_task or self.update_game_installation_status_task.done()):
+                self.update_game_installation_status_task = asyncio.create_task(self.update_game_installation_status())
 
-        if self._asked_for_local and (not self.update_game_running_status_task or self.update_game_running_status_task.done()):
-            self.update_game_running_status_task = asyncio.create_task(self.update_game_running_status())
+            if self._asked_for_local and (not self.update_game_running_status_task or self.update_game_running_status_task.done()):
+                self.update_game_running_status_task = asyncio.create_task(self.update_game_running_status())
 
         if self.owned_games_cache and (not self.check_for_new_games_task or self.check_for_new_games_task.done()):
             self.check_for_new_games_task = asyncio.create_task(self.check_for_new_games())
