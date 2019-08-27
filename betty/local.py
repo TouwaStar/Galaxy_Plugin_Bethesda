@@ -1,6 +1,9 @@
 import sys
 if sys.platform == 'win32':
     import winreg
+
+from threading import Lock, Thread
+
 import psutil
 from consts import BETTY_WINREG_LOCATION, BETTY_LAUNCHER_EXE, WINDOWS_UNINSTALL_LOCATION
 from pathlib import Path
@@ -12,6 +15,11 @@ class LocalClient(object):
     def __init__(self):
         self._is_installed = None
         self.local_games_cache = {}
+
+        self.installed_games_lock = Lock()
+        self.installed_games = {}
+        self.installed_games_task = None
+
         self.clientgame_modify_date = None
 
 
@@ -159,7 +167,7 @@ class LocalClient(object):
                 continue
         return installed_games
 
-    def get_installed_games(self, products):
+    def _update_installed_games(self, products):
         installed_games, products_to_scan = self._check_cached_games(products)
 
         try:
@@ -178,9 +186,25 @@ class LocalClient(object):
         except Exception:
             log.exception(f"Unexpected error when parsing registry")
             raise
-        log.info(f"Returning {installed_games}")
-        return installed_games
+        log.info(f"Setting {installed_games}")
+        self.installed_games_lock.acquire()
+        self.installed_games = installed_games
+        self.installed_games_lock.release()
 
+    def get_installed_products(self, timeout, products_cache):
+        if not self.installed_games_task or self.installed_games_task.isAlive():
+            self.installed_games_task = Thread(target=self._update_installed_games,
+                                               args=(products_cache,), daemon=True)
+            self.installed_games_task.start()
+
+        self.installed_games_task.join(timeout)
+        installed_products = {}
+        if self.installed_games_lock.acquire(True, 1):
+            installed_products = self.installed_games
+            self.installed_games_lock.release()
+        else:
+            log.info("Unable to lock installed_games")
+        return installed_products
 
 
 
