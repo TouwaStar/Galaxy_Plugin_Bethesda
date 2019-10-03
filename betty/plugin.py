@@ -333,6 +333,8 @@ class BethesdaPlugin(Plugin):
         await asyncio.sleep(60)
 
     async def close_bethesda_window(self):
+        if sys.platform != 'win32':
+            return
         window_name = "Bethesda.net Launcher"
         max_delay = 10
         intermediate_sleep = 0.05
@@ -361,11 +363,15 @@ class BethesdaPlugin(Plugin):
             log.error(f"Exception when checking if window is visible {repr(e)}")
 
     async def shutdown_platform_client(self):
+        if sys.platform != 'win32':
+            return
         log.info("killing bethesda")
         subprocess.Popen("taskkill.exe /im \"BethesdaNetLauncher.exe\"")
 
     async def launch_platform_client(self):
         if self.local_client.is_running:
+            return
+        if sys.platform != 'win32':
             return
         log.info("launching bethesda")
         subprocess.Popen('start bethesdanet://', shell=True)
