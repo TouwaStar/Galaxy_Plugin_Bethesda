@@ -3,7 +3,9 @@ import sys
 import logging as log
 import subprocess
 import webbrowser
-import psutil
+import sys
+if sys.platform == 'win32':
+    import psutil
 
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.consts import Platform
@@ -20,7 +22,7 @@ from game_cache import product_cache
 import pickle
 import asyncio
 import time
-
+import ctypes
 
 class BethesdaPlugin(Plugin):
     def __init__(self, reader, writer, token):
@@ -56,6 +58,7 @@ class BethesdaPlugin(Plugin):
             log.info("Finished parsing stored credentials, authenticating")
             user = await self._http_client.authenticate()
 
+            self._http_client.set_auth_lost_callback(self.lost_authentication)
             return Authentication(user_id=user['user_id'], user_name=user['display_name'])
         except Exception as e:
             log.error(f"Couldn't authenticate with stored credentials {repr(e)}")
@@ -73,6 +76,7 @@ class BethesdaPlugin(Plugin):
             log.error(repr(e))
             raise InvalidCredentials()
 
+        self._http_client.set_auth_lost_callback(self.lost_authentication)
         return Authentication(user_id=user['user_id'], user_name=user['display_name'])
 
     def _check_for_owned_products(self, owned_ids):
@@ -328,8 +332,46 @@ class BethesdaPlugin(Plugin):
                 self.add_game(owned_game)
         await asyncio.sleep(60)
 
-    def tick(self):
+    async def close_bethesda_window(self):
+        window_name = "Bethesda.net Launcher"
+        max_delay = 10
+        intermediate_sleep = 0.05
+        stop_time = time.time() + max_delay
 
+        def timed_out():
+            if time.time() >= stop_time:
+                log.warning(f"Timed out trying to close {window_name}")
+                return True
+            return False
+
+        try:
+            hwnd = ctypes.windll.user32.FindWindowW(None, window_name)
+            while not ctypes.windll.user32.IsWindowVisible(hwnd):
+                hwnd = ctypes.windll.user32.FindWindowW(None, window_name)
+                await asyncio.sleep(intermediate_sleep)
+                if timed_out():
+                    return
+
+            while ctypes.windll.user32.IsWindowVisible(hwnd):
+                await asyncio.sleep(intermediate_sleep)
+                ctypes.windll.user32.CloseWindow(hwnd)
+                if timed_out():
+                    return
+        except Exception as e:
+            log.error(f"Exception when checking if window is visible {repr(e)}")
+
+    async def shutdown_platform_client(self):
+        log.info("killing bethesda")
+        subprocess.Popen("taskkill.exe /im \"BethesdaNetLauncher.exe\"")
+
+    async def launch_platform_client(self):
+        if self.local_client.is_running:
+            return
+        log.info("launching bethesda")
+        subprocess.Popen('start bethesdanet://', shell=True)
+        asyncio.create_task(self.close_bethesda_window())
+
+    def tick(self):
         if sys.platform == 'win32':
             if self._asked_for_local and (not self.update_game_installation_status_task or self.update_game_installation_status_task.done()):
                 self.update_game_installation_status_task = asyncio.create_task(self.update_game_installation_status())

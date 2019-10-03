@@ -29,6 +29,7 @@ class AuthenticatedHttpClient(HttpClient):
         self.bearer = None
         self.user = None
         self._cookie_jar = CookieJar()
+        self._auth_lost_callback = None
 
         super().__init__(cookie_jar=self._cookie_jar)
 
@@ -60,12 +61,14 @@ class AuthenticatedHttpClient(HttpClient):
 
     async def authenticate(self):
         url = "https://api.bethesda.net/dwemer/attunement/v1/authenticate"
-
+        cookies_before = self._cookie_jar
         try:
             resp = await self.request("put", url=url)
             resp = await resp.json()
         except Exception as e:
             log.error(repr(e))
+            if self._auth_lost_callback:
+                self._auth_lost_callback()
             raise
         self.bearer = resp['idToken']
         display_name = "Display_Name"
@@ -80,6 +83,11 @@ class AuthenticatedHttpClient(HttpClient):
             log.exception(f"Unable to parse display_name and user_id {repr(e)}")
         self.user = {'display_name': display_name, 'user_id': user_id}
         self._store_credentials(self.get_credentials())
+
+        # For investigation
+        if cookies_before == self._cookie_jar:
+            log.info("Cookies after auth are the same as before ")
+
         return self.user
 
 
