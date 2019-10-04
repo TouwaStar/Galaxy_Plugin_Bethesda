@@ -10,7 +10,7 @@ if sys.platform == 'win32':
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.consts import Platform
 from galaxy.api.types import NextStep, Authentication, Game, LicenseInfo, LicenseType, LocalGame, LocalGameState, Cookie
-from galaxy.api.errors import InvalidCredentials, UnknownError
+from galaxy.api.errors import InvalidCredentials, UnknownError, BackendError
 from version import __version__
 
 from consts import AUTH_PARAMS
@@ -123,7 +123,7 @@ class BethesdaPlugin(Plugin):
 
         try:
             owned_ids = await self.bethesda_client.get_owned_ids()
-        except UnknownError as e:
+        except (UnknownError, BackendError) as e:
             log.warning(f"No owned games detected {repr(e)}")
 
         log.info(f"Owned Ids: {owned_ids}")
