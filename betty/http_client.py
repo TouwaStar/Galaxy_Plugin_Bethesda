@@ -1,6 +1,6 @@
 
 from galaxy.http import HttpClient
-
+from galaxy.api.errors import AuthenticationRequired, AccessDenied
 import aiohttp
 import logging as log
 from yarl import URL
@@ -65,7 +65,7 @@ class AuthenticatedHttpClient(HttpClient):
         try:
             resp = await self.request("put", url=url)
             resp = await resp.json()
-        except Exception as e:
+        except (AuthenticationRequired, AccessDenied) as e:
             log.error(repr(e))
             if self._auth_lost_callback:
                 self._auth_lost_callback()
