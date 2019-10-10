@@ -22,7 +22,6 @@ class LocalClient(object):
 
         self.clientgame_modify_date = None
 
-
     @property
     def client_exe_path(self):
         try:
@@ -98,6 +97,7 @@ class LocalClient(object):
             log.exception(f"Exception while checking if client is installed, assuming not installed {repr(e)}")
             return False
 
+    @staticmethod
     def is_local_game_installed(self, local_game):
         try:
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)

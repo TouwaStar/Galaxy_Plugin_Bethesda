@@ -8,6 +8,7 @@ import pickle
 import base64
 import json
 
+
 class CookieJar(aiohttp.CookieJar):
     def __init__(self):
         super().__init__()
@@ -41,7 +42,6 @@ class AuthenticatedHttpClient(HttpClient):
 
     def set_auth_lost_callback(self, callback):
         self._auth_lost_callback = callback
-
 
     def get_credentials(self):
         creds = self.user

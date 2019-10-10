@@ -1,6 +1,4 @@
-
 import re
-
 
 AUTH_URL = r"https://account.bethesda.net/login"
 AUTH_REDIRECT_URL = r"radiant/v1/graphql"
@@ -10,11 +8,9 @@ BETTY_LAUNCHER_EXE = "BethesdaNetLauncher.exe"
 
 WINDOWS_UNINSTALL_LOCATION = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
 
+
 def regex_pattern(regex):
     return ".*" + re.escape(regex) + ".*"
-
-
-
 
 
 AUTH_PARAMS = {
