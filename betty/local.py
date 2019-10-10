@@ -1,10 +1,10 @@
 import sys
 if sys.platform == 'win32':
     import winreg
+    import psutil
 
 from threading import Lock, Thread
 
-import psutil
 from consts import BETTY_WINREG_LOCATION, BETTY_LAUNCHER_EXE, WINDOWS_UNINSTALL_LOCATION
 from pathlib import Path
 import os
