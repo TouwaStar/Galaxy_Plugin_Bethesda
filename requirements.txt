@@ -1,0 +1,4 @@
+aiohttp==3.5.4
+galaxy.plugin.api==0.47
+certifi==2019.3.9
+psutil==5.6.1
