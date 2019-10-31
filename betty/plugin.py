@@ -1,5 +1,3 @@
-import sys
-
 import logging as log
 import subprocess
 import webbrowser
@@ -22,7 +20,8 @@ from game_cache import product_cache
 import pickle
 import asyncio
 import time
-import ctypes
+if sys.platform == 'win32':
+    import ctypes
 
 class BethesdaPlugin(Plugin):
     def __init__(self, reader, writer, token):
