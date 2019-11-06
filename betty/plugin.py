@@ -11,7 +11,7 @@ from galaxy.api.types import NextStep, Authentication, Game, LicenseInfo, Licens
 from galaxy.api.errors import InvalidCredentials, UnknownError, BackendError
 from version import __version__
 
-from consts import AUTH_PARAMS
+from consts import AUTH_PARAMS, JS
 from backend import BethesdaClient
 from http_client import AuthenticatedHttpClient
 from local import LocalClient
@@ -42,7 +42,7 @@ class BethesdaPlugin(Plugin):
 
     async def authenticate(self, stored_credentials=None):
         if not stored_credentials:
-            return NextStep("web_session", AUTH_PARAMS, cookies=[Cookie("passedICO", "true", ".bethesda.net")])
+            return NextStep("web_session", AUTH_PARAMS, cookies=[Cookie("passedICO", "true", ".bethesda.net")], js=JS)
         try:
             log.info("Got stored credentials")
             cookies = pickle.loads(bytes.fromhex(stored_credentials['cookie_jar']))
@@ -65,8 +65,10 @@ class BethesdaPlugin(Plugin):
 
     async def pass_login_credentials(self, step, credentials, cookies):
         cookiez = {}
+        illegal_keys = ['']
         for cookie in cookies:
-            cookiez[cookie['name']] = cookie['value']
+            if cookie['name'] not in illegal_keys:
+                cookiez[cookie['name']] = cookie['value']
         self._http_client.update_cookies(cookiez)
 
         try:

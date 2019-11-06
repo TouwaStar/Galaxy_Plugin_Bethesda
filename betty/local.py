@@ -98,7 +98,7 @@ class LocalClient(object):
             return False
 
     @staticmethod
-    def is_local_game_installed(self, local_game):
+    def is_local_game_installed(local_game):
         try:
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
             with winreg.OpenKey(reg, WINDOWS_UNINSTALL_LOCATION) as key:
