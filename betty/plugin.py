@@ -144,7 +144,7 @@ class BethesdaPlugin(Plugin):
             return []
         local_games = []
 
-        installed_products = self.local_client.get_installed_products(2, self.products_cache)
+        installed_products = self.local_client.get_installed_products(timeout=2, products_cache=self.products_cache)
 
         log.info(f"Installed products {installed_products}")
         for product in self.products_cache:
@@ -162,11 +162,11 @@ class BethesdaPlugin(Plugin):
             log.error(f"Incompatible platform {sys.platform}")
             return
 
-        if not self.local_client.is_installed:
+        if not self.local_client.is_installed():
             await self._open_betty_browser()
             return
 
-        if self.local_client.is_running:
+        if self.local_client.is_running():
             self.local_client.focus_client_window()
             await self.launch_game(game_id)
         else:
@@ -186,18 +186,18 @@ class BethesdaPlugin(Plugin):
         if sys.platform != 'win32':
             log.error(f"Incompatible platform {sys.platform}")
             return
-        if not self.local_client.is_installed:
+        if not self.local_client.is_installed():
             await self._open_betty_browser()
             return
 
         for product in self.products_cache:
             if self.products_cache[product]['local_id'] == game_id:
                 if not self.products_cache[product]['installed']:
-                    if not self.local_client.is_running:
+                    if not self.local_client.is_running():
                         log.warning("Got launch on a not installed game, installing")
                         return await self.install_game(game_id)
                 else:
-                    if not self.local_client.is_running:
+                    if not self.local_client.is_running():
                         self.launching_lock = time.time() + 45
                     else:
                         self.launching_lock = time.time() + 30
@@ -215,7 +215,7 @@ class BethesdaPlugin(Plugin):
             log.error(f"Incompatible platform {sys.platform}")
             return
 
-        if not self.local_client.is_installed:
+        if not self.local_client.is_installed():
             await self._open_betty_browser()
             return
 
@@ -229,7 +229,7 @@ class BethesdaPlugin(Plugin):
 
         subprocess.Popen(cmd, shell=True)
 
-        if self.local_client.is_running:
+        if self.local_client.is_running():
             await asyncio.sleep(2)  # QOL, bethesda slowly reacts to uninstall command,
             self.local_client.focus_client_window()
 
@@ -269,8 +269,9 @@ class BethesdaPlugin(Plugin):
 
     async def update_game_installation_status(self):
 
-        if self.local_client.clientgame_changed():
+        if self.local_client.clientgame_changed() or self.local_client.launcher_children_number_changed():
             await asyncio.sleep(1)
+            log.info("Starting heavy installation status check")
             await self._heavy_installation_status_check()
         else:
             self._light_installation_status_check()
@@ -370,7 +371,7 @@ class BethesdaPlugin(Plugin):
         subprocess.Popen("taskkill.exe /im \"BethesdaNetLauncher.exe\"")
 
     async def launch_platform_client(self):
-        if self.local_client.is_running:
+        if self.local_client.is_running():
             return
         if sys.platform != 'win32':
             return
