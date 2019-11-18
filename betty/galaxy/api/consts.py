@@ -81,6 +81,17 @@ class Platform(Enum):
     NintendoDs = "nds"
     Nintendo3Ds = "3ds"
     PathOfExile = "pathofexile"
+    Twitch = "twitch"
+    Minecraft = "minecraft"
+    GameSessions = "gamesessions"
+    Nuuvem = "nuuvem"
+    FXStore = "fxstore"
+    IndieGala = "indiegala"
+    Playfire = "playfire"
+    Oculus = "oculus"
+    Test = "test"
+    Rockstar = "rockstar"
+
 
 class Feature(Enum):
     """Possible features that can be implemented by an integration.
@@ -100,6 +111,9 @@ class Feature(Enum):
     ImportFriends = "ImportFriends"
     ShutdownPlatformClient = "ShutdownPlatformClient"
     LaunchPlatformClient = "LaunchPlatformClient"
+    ImportGameLibrarySettings = "ImportGameLibrarySettings"
+    ImportOSCompatibility = "ImportOSCompatibility"
+    ImportUserPresence = "ImportUserPresence"
 
 
 class LicenseType(Enum):
@@ -118,3 +132,20 @@ class LocalGameState(Flag):
     None_ = 0
     Installed = 1
     Running = 2
+
+
+class OSCompatibility(Flag):
+    """Possible game OS compatibility.
+    Use "bitwise or" to express multiple OSs compatibility, e.g. ``os=OSCompatibility.Windows|OSCompatibility.MacOS``
+    """
+    Windows = 0b001
+    MacOS   = 0b010
+    Linux   = 0b100
+
+
+class PresenceState(Enum):
+    """"Possible states of a user."""
+    Unknown = "unknown"
+    Online = "online"
+    Offline = "offline"
+    Away = "away"

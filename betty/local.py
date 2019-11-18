@@ -12,6 +12,8 @@ import logging as log
 import subprocess
 from file_read_backwards import FileReadBackwards
 
+import asyncio
+
 class LocalClient(object):
     def __init__(self):
         self._is_installed = None
@@ -24,8 +26,9 @@ class LocalClient(object):
         self.clientgame_modify_date = None
 
         self.betty_client_process = None
-        self.betty_client_process_children_len = 0
+        self.betty_client_process_children_len = -1
         self.betty_client_path = None
+
 
     @property
     def client_exe_path(self):
@@ -71,11 +74,9 @@ class LocalClient(object):
             return
         subprocess.Popen(self.client_exe_path)
 
-    def is_running(self):
-        if self.betty_client_process:
-            if self.betty_client_process.is_running():
-                return True
+    async def is_running(self):
         for proc in psutil.process_iter():
+            await asyncio.sleep(0.10)
             try:
                 # Check if process name contains the given name string.
                 if "bethesdanetlauncher.exe" in proc.name().lower():
@@ -279,9 +280,9 @@ class LocalClient(object):
         return installed_products
 
     def launcher_children_number_changed(self):
-        if not self.is_running():
-            log.info("betty not running")
+        if not self.betty_client_process:
             return False
+
         children_number = self.betty_client_process_children_len
         if children_number != len(self.betty_client_process.children()):
             self.betty_client_process_children_len = len(self.betty_client_process.children())
