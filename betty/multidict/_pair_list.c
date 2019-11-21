@@ -1,4 +1,5 @@
 #include <string.h>
+#include "_istr.h"
 #include "_pair_list.h"
 
 #include <Python.h>
@@ -91,9 +92,12 @@ key_to_str(PyObject *key)
 static PyObject *
 ci_key_to_str(PyObject *key)
 {
+    PyObject *ret;
     PyTypeObject *type = Py_TYPE(key);
     if ((PyObject *)type == _istr_type) {
-        return _PyObject_CallMethodId(key, &PyId_lower, NULL);
+        ret = ((istrobject*)key)->canonical;
+        Py_INCREF(ret);
+        return ret;
     }
     if (PyUnicode_Check(key)) {
         return _PyObject_CallMethodId(key, &PyId_lower, NULL);
@@ -157,6 +161,7 @@ _pair_list_new(calc_identity_func calc_identity)
     list->version = NEXT_VERSION();
     list->calc_identity = calc_identity;
 
+    PyObject_GC_Track(list);
     return (PyObject *)list;
 }
 

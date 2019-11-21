@@ -397,6 +397,13 @@ class Plugin:
         params = {"user_id": user_id}
         self._connection.send_notification("friend_removed", params)
 
+    def update_friend_info(self, user: UserInfo) -> None:
+        """Notify the client about the updated friend information.
+
+        :param user: UserInfo of a friend whose info was updated
+        """
+        self._connection.send_notification("friend_updated", params={"friend_info": user})
+
     def update_game_time(self, game_time: GameTime) -> None:
         """Notify the client to update game time for a game.
 
@@ -404,6 +411,20 @@ class Plugin:
         """
         params = {"game_time": game_time}
         self._connection.send_notification("game_time_updated", params)
+
+    def update_user_presence(self, user_id: str, user_presence: UserPresence) -> None:
+        """Notify the client about the updated user presence information.
+
+        :param user_id: the id of the user whose presence information is updated
+        :param user_presence: presence information of the specified user
+        """
+        self._connection.send_notification(
+            "user_presence_updated",
+            {
+                "user_id": user_id,
+                "presence": user_presence
+            }
+        )
 
     def _game_time_import_success(self, game_time: GameTime) -> None:
         params = {"game_time": game_time}
@@ -557,10 +578,11 @@ class Plugin:
 
     async def pass_login_credentials(self, step: str, credentials: Dict[str, str], cookies: List[Dict[str, str]]) \
         -> Union[NextStep, Authentication]:
-        """This method is called if we return galaxy.api.types.NextStep from authenticate or from pass_login_credentials.
+        """This method is called if we return :class:`~galaxy.api.types.NextStep` from :meth:`.authenticate`
+        or :meth:`.pass_login_credentials`.
         This method's parameters provide the data extracted from the web page navigation that previous NextStep finished on.
-        This method should either return galaxy.api.types.Authentication if the authentication is finished
-        or galaxy.api.types.NextStep if it requires going to another cef url.
+        This method should either return :class:`~galaxy.api.types.Authentication` if the authentication is finished
+        or :class:`~galaxy.api.types.NextStep` if it requires going to another cef url.
         This method is called by the GOG Galaxy Client.
 
         :param step: deprecated.

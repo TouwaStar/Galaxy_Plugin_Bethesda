@@ -1,3 +1,5 @@
+# cython: language_level=3
+
 from __future__ import absolute_import
 
 import sys
@@ -142,11 +144,10 @@ cdef class MultiDictProxy(_Base):
         cdef _Base base
         if not isinstance(arg, self._proxy_classes):
             raise TypeError(
-                'ctor requires {} instance'
-                ', not {}'.format(
-                    ' or '.join(self._proxy_classes),
-                    type(arg)))
-
+                "ctor requires {} instance, not {}".format(
+                    " or ".join(x.__name__ for x in self._proxy_classes), type(arg)
+                )
+            )
         base = arg
         self._impl = base._impl
 
