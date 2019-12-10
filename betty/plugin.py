@@ -26,10 +26,11 @@ import time
 if sys.platform == 'win32':
     import ctypes
 
-@dataclass
-class RunningGame:
-    execs: {}
-    process: ProcessInfo
+if sys.platform == 'win32':
+    @dataclass
+    class RunningGame:
+        execs: {}
+        process: ProcessInfo
 
 
 class BethesdaPlugin(Plugin):
