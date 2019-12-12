@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from galaxy.api.plugin import Plugin, create_and_run_plugin
 from galaxy.api.consts import Platform
 from galaxy.api.types import NextStep, Authentication, Game, LicenseInfo, LicenseType, LocalGame, LocalGameState, Cookie
-from galaxy.api.errors import InvalidCredentials, UnknownError, BackendError
+from galaxy.api.errors import InvalidCredentials, UnknownError, BackendError, AccessDenied, Banned
 from version import __version__
 
 from consts import AUTH_PARAMS, JS
@@ -76,7 +76,7 @@ class BethesdaPlugin(Plugin):
 
             self._http_client.set_auth_lost_callback(self.lost_authentication)
             return Authentication(user_id=user['user_id'], user_name=user['display_name'])
-        except Exception as e:
+        except (AccessDenied, Banned, UnknownError) as e:
             log.error(f"Couldn't authenticate with stored credentials {repr(e)}")
             raise InvalidCredentials()
 
