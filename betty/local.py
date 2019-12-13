@@ -92,6 +92,7 @@ class LocalClient(object):
         if sys.platform != 'win32':
             log.info("Platform is not compatible")
             return False
+        path = None
         try:
             log.info("Connecting to hkey_local_machine key")
             reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
