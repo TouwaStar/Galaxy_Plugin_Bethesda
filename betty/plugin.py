@@ -183,7 +183,7 @@ class BethesdaPlugin(Plugin):
             await self._open_betty_browser()
             return
 
-        if not self.local_client.betty_client_process:
+        if self.local_client.betty_client_process:
             self.local_client.focus_client_window()
             await self.launch_game(game_id)
         else:
@@ -210,11 +210,11 @@ class BethesdaPlugin(Plugin):
         for product in self.products_cache:
             if self.products_cache[product]['local_id'] == game_id:
                 if not self.products_cache[product]['installed']:
-                    if not not self.local_client.betty_client_process:
+                    if not self.local_client.betty_client_process:
                         log.warning("Got launch on a not installed game, installing")
                         return await self.install_game(game_id)
                 else:
-                    if not not self.local_client.betty_client_process:
+                    if not self.local_client.betty_client_process:
                         self.launching_lock = time.time() + 45
                     else:
                         self.launching_lock = time.time() + 30
