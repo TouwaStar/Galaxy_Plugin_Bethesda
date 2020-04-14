@@ -75,6 +75,7 @@ class BethesdaPlugin(Plugin):
             user = await self._http_client.authenticate()
 
             self._http_client.set_auth_lost_callback(self.lost_authentication)
+
             return Authentication(user_id=user['user_id'], user_name=user['display_name'])
         except (AccessDenied, Banned, UnknownError) as e:
             log.error(f"Couldn't authenticate with stored credentials {repr(e)}")
@@ -429,8 +430,9 @@ class BethesdaPlugin(Plugin):
             if not self.betty_client_process_task or self.betty_client_process_task.done():
                 self.betty_client_process_task = asyncio.create_task(self.local_client.is_running())
 
-        if self.owned_games_cache and (not self.check_for_new_games_task or self.check_for_new_games_task.done()):
-            self.check_for_new_games_task = asyncio.create_task(self.check_for_new_games())
+        if self._http_client.bearer:
+            if self.owned_games_cache and (not self.check_for_new_games_task or self.check_for_new_games_task.done()):
+                self.check_for_new_games_task = asyncio.create_task(self.check_for_new_games())
 
     async def shutdown(self):
         await self._http_client.close()
