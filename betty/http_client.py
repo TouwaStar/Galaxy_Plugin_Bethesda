@@ -67,6 +67,7 @@ class AuthenticatedHttpClient(HttpClient):
             resp = await resp.json()
         except (AuthenticationRequired, AccessDenied) as e:
             log.error(repr(e))
+            self.bearer = None
             if self._auth_lost_callback:
                 self._auth_lost_callback()
             raise
