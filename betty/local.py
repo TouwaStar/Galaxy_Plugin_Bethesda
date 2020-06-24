@@ -215,6 +215,17 @@ class LocalClient(object):
             log.error(f"Unable to read client log, probably doesnt exist {repr(e)}")
         return ""
 
+    async def get_size_at_path(self, start_path):
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(start_path):
+            for f in filenames:
+                await asyncio.sleep(0)
+                fp = os.path.join(dirpath, f)
+                if not os.path.islink(fp):
+                    total_size += os.path.getsize(fp)
+
+        return total_size
+
     def _scan_launcher_children(self, products):
 
         installed_games = {}
@@ -264,7 +275,7 @@ class LocalClient(object):
         self.installed_games_lock.release()
 
     def get_installed_products(self, timeout, products_cache):
-        if not self.installed_games_task or not self.installed_games_task.isAlive():
+        if not self.installed_games_task or not self.installed_games_task.is_alive():
             self.installed_games_task = Thread(target=self._update_installed_games,
                                                args=(products_cache,), daemon=True)
             self.installed_games_task.start()
