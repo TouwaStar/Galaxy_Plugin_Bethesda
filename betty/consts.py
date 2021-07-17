@@ -9,6 +9,7 @@ BETTY_LAUNCHER_EXE = "BethesdaNetLauncher.exe"
 
 WINDOWS_UNINSTALL_LOCATION = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
 
+
 def regex_pattern(regex):
     return ".*" + re.escape(regex) + ".*"
 
@@ -21,16 +22,31 @@ AUTH_PARAMS = {
     "end_uri_regex": regex_pattern(AUTH_REDIRECT_URL)
 }
 
-JS = {regex_pattern(AUTH_FINISH_URL): [
-r'''
-    function findpersist() {
-        if (document.getElementsByName("persist").length < 1) {
-            setTimeout(findpersist, 500); // give everything some time to render
-        } else {
-            document.getElementsByName("persist")[0].click();
-        }
-    }
-    findpersist();
-'''
-]}
+JS = {
+    regex_pattern(AUTH_FINISH_URL): [
+        r'''
+            function getCookie(name) {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop().split(';').shift();
+            }
 
+            function check_login() {
+                if (getCookie('bnet-username')) {
+                    location.href = '%s';
+                }
+            }
+
+            setInterval(check_login, 3000);
+
+            function findpersist() {
+                if (document.getElementsByName("persist").length < 1) {
+                    setTimeout(findpersist, 500); // give everything some time to render
+                } else {
+                    document.getElementsByName("persist")[0].click();
+                }
+            }
+            findpersist();
+        ''' % AUTH_REDIRECT_URL
+    ]
+}
