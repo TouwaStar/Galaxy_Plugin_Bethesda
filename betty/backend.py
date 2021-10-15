@@ -40,7 +40,7 @@ class BethesdaClient:
 
     async def get_game_details(self, business_id):
         headers = {
-            'Authorization': f"Bearer 26a7d8bae3b004c1847e14418567d527e337c97440ac52113306ac6861036590",
+            'Authorization': f"Bearer OUFuRGfR35XVY7LML-7ITHALa_oiRoTAwQxFTrGMgz8",
             'Content-Type': "application/json"
         }
         resp = await self.http_client.do_request('get', f"https://cdn.contentful.com/spaces/rporu91m20dc/environments/master/entries?skip=0&order=&include=3&content_type=productCode&locale=en&limit=100&fields.entitlementBusinessId={business_id}", headers=headers)

@@ -149,7 +149,11 @@ class BethesdaPlugin(Plugin):
         product_ids = self._check_for_owned_products(owned_ids)
         pre_order_ids = set(owned_ids) - set(product_ids)
 
-        games_to_send.extend(await self._get_owned_pre_orders(pre_order_ids))
+        try:
+            games_to_send.extend(await self._get_owned_pre_orders(pre_order_ids))
+        except Exception as e:
+            log.warning(f"Unable to obtain preorders: {repr(e)}")
+
         games_to_send.extend(self._get_owned_games())
 
         log.info(f"Games to send (with free games): {games_to_send}")
